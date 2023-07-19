@@ -28,7 +28,17 @@ class OAuthService {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('access_token');
   }
+    Future<String?> handleAuthorizationFlow() async {
+    try {
+      // TODO: Handle the authorization flow and exchange authorization code for access token
 
+      return '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'; 
+    } catch (e) {
+      // Handle the error or return null if the authorization flow failed
+      print('Authorization flow error: $e');
+      return null;
+    }
+  }
 
 }
 
