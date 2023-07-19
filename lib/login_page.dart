@@ -1,29 +1,22 @@
 import 'package:flutter/material.dart';
-import './oauth_service.dart';
+import './Oauth_service.dart';
 import './profile_page.dart';
-import 'package:auth_buttons/auth_buttons.dart';
 
 class LoginPage extends StatelessWidget {
   final OAuthService oauthService = OAuthService();
-
   Future<void> _login(BuildContext context) async {
     try {
-      final isAuthenticated = await oauthService.authenticate();
-      if (isAuthenticated) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => ProfilePage()),
+      await oauthService.launchUrl();
+      final accessToken = await oauthService.getAccessToken();
+      if (accessToken != null) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => ProfilePage(),
+          ),
         );
-      } else {
-        // Handle login failure
-        _showErrorDialog(context, 'Login failed. Please try again.');
       }
     } catch (e) {
-      print('Login error: $e');
-      // Handle the error or show an error message
-      _showErrorDialog(
-          context, 'An error occurred during login. Please try again later.');
-      print(e);
+      _showErrorDialog(context, e.toString());
     }
   }
 

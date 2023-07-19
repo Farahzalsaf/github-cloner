@@ -11,6 +11,8 @@ dependencies:
   flutter:
     sdk: flutter
   oauth2: ^2.0.2
+  shared_preferences: ^2.2.0
+  url_launcher: ^6.1.12
 
 dev_dependencies:
   flutter_test:
