@@ -1,99 +1,178 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
-import './login_page.dart';
-import './profile_page.dart';
-import './oauth_service.dart';
+import 'dart:convert';
 
-void main() => runApp(MyApp());
+import 'package:auth_buttons/auth_buttons.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+// import 'package:url_launcher/url_launcher.dart';
+// import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'GitHub Login',
-      home: LoginPage(),
-      routes: {
-        '/profile': (context) => ProfilePage(),
-      },
+      title: 'Flutter Demo',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }
 }
 
-class ProfilePage extends StatelessWidget {
-  final OAuthService oauthService = OAuthService();
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key, required this.title});
+
+  // This widget is the home page of your application. It is stateful, meaning
+  // that it has a State object (defined below) that contains fields that affect
+  // how it looks.
+
+  // This class is the configuration for the state. It holds the values (in this
+  // case the title) provided by the parent (in this case the App widget) and
+  // used by the build method of the State. Fields in a Widget subclass are
+  // always marked "final".
+
+  final String title;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Profile Page'),
-      ),
-      body: Center(
-        child: ElevatedButton(
-          onPressed: () async {
-            // Get the access token from the OAuthService
-            final accessToken = await oauthService.getAccessToken();
-            if (accessToken != null) {
-              // Make authenticated API requests or perform other tasks with the access token
-              // Navigate back to the login page
-              Navigator.pop(context);
-            } else {
-              // Access token is null, handle the error or show login page again
-              Navigator.pop(context);
+  State<MyHomePage> createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  final Uri _url = Uri.parse(
+      'https://github.com/login/oauth/authorize?client_id=62c3f7e3b4797d7ff0ed&redirect_uri=http://localhost:3000/callback&scope=read:user');
+
+  Future<String?> _showAuthDialog(Uri authUrl) {
+    return showDialog<String>(
+      context: context,
+      builder: (context) => Dialog(
+        child: InAppWebView(
+          initialUrlRequest: URLRequest(url: authUrl),
+          onProgressChanged: (controller, progress) async {
+            if (progress == 100) {
+              final url = await controller.getUrl();
+              if (url!
+                  .toString()
+                  .startsWith('http://localhost:3000/callback')) {
+                final code = Uri.parse(url.toString()).queryParameters['code'];
+                if (code != null) {
+                  Future<void> _handleCode(String code) async {
+                    await Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LoggedIn(code: code),
+                      ),
+                    );
+                  }
+
+                  await _handleCode(code);
+                }
+              }
             }
           },
-          child: Text('Logout'),
         ),
       ),
     );
   }
-}
 
-class LoginPage extends StatelessWidget {
-  final OAuthService oauthService = OAuthService();
-
-  Future<void> _login(BuildContext context) async {
-    try {
-      await oauthService.launchUrl();
-    } catch (e) {
-      _showErrorDialog(context, e.toString());
-    }
-  }
-
-  void _showErrorDialog(BuildContext context, String message) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Login Error'),
-          content: Text(message),
-          actions: [
-            TextButton(
-              child: Text('OK'),
+  @override
+  Widget build(BuildContext context) {
+    // This method is rerun every time setState is called, for instance as done
+    // by the _incrementCounter method above.
+    //
+    // The Flutter framework has been optimized to make rerunning build methods
+    // fast, so that you can just rebuild anything that needs updating rather
+    // than having to individually change instances of widgets.
+    return Scaffold(
+      appBar: AppBar(
+        // Here we take the value from the MyHomePage object that was created by
+        // the App.build method, and use it to set our appbar title.
+        title: Text(widget.title),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            GithubAuthButton(
               onPressed: () {
-                Navigator.of(context).pop();
+                _showAuthDialog(_url);
               },
             ),
           ],
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Login'),
-      ),
-      body: Center(
-        child: ElevatedButton(
-          child: Text('Login with GitHub'),
-          onPressed: () => _login(context),
         ),
       ),
     );
   }
 }
 
+class LoggedIn extends StatefulWidget {
+  final String code;
+  const LoggedIn({super.key, required this.code});
+
+  @override
+  State<LoggedIn> createState() => _LoggedInState();
+}
+
+class _LoggedInState extends State<LoggedIn> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Logged In'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Text(
+              'You are logged in and here is your code ${widget.code}!',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  final storage = FlutterSecureStorage();
+
+Future<void> getAccessToken(String clientId, String clientSecret, String code) async {
+  final tokenUrl = 'https://github.com/login/oauth/access_token';
+
+  final headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+
+  final body = jsonEncode({
+    'client_id': '62c3f7e3b4797d7ff0ed',
+    'client_secret': 'fdb5b7b94552992b6c8fcdde502f6029e9df5403',
+    'code': '439c7ee38f7db5f1e6fa',
+  });
+
+  
+  final response = await http.post(
+    Uri.parse(tokenUrl),
+    headers: headers,
+    body: body,
+  );
+
+  if (response.statusCode == 200) {
+    final data = jsonDecode(response.body);
+    if (data['access_token'] != null) {
+      await storage.write(key: "token", value: data['access_token']);
+    } else {
+      throw Exception('Access token not found in the response');
+    }
+  } else {
+    throw Exception('Failed to get access token: ${response.statusCode}');
+  }
+}
+}

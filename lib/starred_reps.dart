@@ -3,8 +3,8 @@ import './github_api_service.dart';
 
 class StarredRepositoriesPage extends StatelessWidget {
   final GithubApiService githubApiService = GithubApiService();
-
-  StarredRepositoriesPage({super.key});
+  final String code;
+  StarredRepositoriesPage({super.key, required this.code});
 
   @override
   Widget build(BuildContext context) {
@@ -13,12 +13,13 @@ class StarredRepositoriesPage extends StatelessWidget {
         title: const Text('Starred Repositories'),
       ),
       body: FutureBuilder<List<dynamic>>(
-        future: githubApiService.fetchStarredRepositories(),
+        future: githubApiService.getstarredrepos(code),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return const Center(child: Text('Error fetching starred repositories'));
+            return const Center(
+                child: Text('Error fetching starred repositories'));
           } else if (snapshot.hasData) {
             final starredRepositories = snapshot.data!;
             return ListView.builder(

@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 class OAuthService {
   final String clientId = '62c3f7e3b4797d7ff0ed';
-  final String clientSecret = '320bbf27ff4f7c021405dc7cc671edad90c8dae4';
+  final String clientSecret = 'fdb5b7b94552992b6c8fcdde502f6029e9df5403';
   final String authorizationUrl =
       'http://localhost:3000/callback';
   final String tokenUrl = 'https://github.com/login/oauth/access_token';
