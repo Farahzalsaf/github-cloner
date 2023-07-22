@@ -160,7 +160,7 @@ Future<String?> getAccessToken(String code) async {
     final headers = {
       'Content-Type': 'application/json',
       'Accept': '*/*',
-      'Authorization':'Bearer token'
+      'Authorization': 'Bearer token'
     };
 
     final body = {
@@ -171,7 +171,6 @@ Future<String?> getAccessToken(String code) async {
 
     final response = await dio.get(
       tokenUrl,
-      
       options: Options(
         headers: headers,
       ),
