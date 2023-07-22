@@ -1,10 +1,9 @@
 import 'dart:convert';
-
 import 'package:auth_buttons/auth_buttons.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
+import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 // import 'package:url_launcher/url_launcher.dart';
 // import 'package:shared_preferences/shared_preferences.dart';
 
@@ -63,6 +62,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   .toString()
                   .startsWith('http://localhost:3000/callback')) {
                 final code = Uri.parse(url.toString()).queryParameters['code'];
+
                 if (code != null) {
                   Future<void> _handleCode(String code) async {
                     await Navigator.pushReplacement(
@@ -83,18 +83,49 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  Future<String?> getAccessToken(String code) async {
+    try {
+      const tokenUrl = 'https://github.com/login/oauth/access_token';
+      Dio dio = Dio();
+      dio.interceptors.add(PrettyDioLogger());
+      final headers = {
+        'Content-Type': 'application/json',
+        'Accept': '*/*',
+      };
+
+      final body = {
+        'client_id': "62c3f7e3b4797d7ff0ed",
+        'client_secret': "fdb5b7b94552992b6c8fcdde502f6029e9df5403",
+        'code': code,
+      };
+
+      final response = await dio.get(
+        tokenUrl,
+        options: Options(
+          headers: headers,
+        ),
+        data: body,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.data);
+        if (data['access_token'] != null) {
+          return data['access_token'];
+        } else {
+          throw Exception('Access token not found in the response');
+        }
+      } else {
+        throw Exception('Failed to get access token: ${response.statusCode}');
+      }
+    } catch (e) {
+      print(e);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
         title: Text(widget.title),
       ),
       body: Center(
@@ -102,8 +133,8 @@ class _MyHomePageState extends State<MyHomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             GithubAuthButton(
-              onPressed: () {
-                _showAuthDialog(_url);
+              onPressed: () async {
+                await _showAuthDialog(_url);
               },
             ),
           ],
@@ -121,7 +152,55 @@ class LoggedIn extends StatefulWidget {
   State<LoggedIn> createState() => _LoggedInState();
 }
 
+Future<String?> getAccessToken(String code) async {
+  try {
+    const tokenUrl = 'https://github.com/login/oauth/access_token';
+    Dio dio = Dio();
+    dio.interceptors.add(PrettyDioLogger());
+    final headers = {
+      'Content-Type': 'application/json',
+      'Accept': '*/*',
+      'Authorization':'Bearer token'
+    };
+
+    final body = {
+      'client_id': "62c3f7e3b4797d7ff0ed",
+      'client_secret': "fdb5b7b94552992b6c8fcdde502f6029e9df5403",
+      'code': code,
+    };
+
+    final response = await dio.get(
+      tokenUrl,
+      
+      options: Options(
+        headers: headers,
+      ),
+      data: body,
+    );
+
+    if (response.statusCode == 200) {
+      // final data = jsonDecode(response.data);
+      final data = response.data;
+      String res = '';
+      if (data != null) {
+        res = data.replaceAll('access_token=', '');
+        res = res.replaceAll('&scope=read%3Auser&token_type=bearer', '');
+        print(data);
+        return await res;
+      } else {
+        throw Exception('Access token not found in the response');
+      }
+    } else {
+      throw Exception('Failed to get access token: ${response.statusCode}');
+    }
+  } catch (e) {
+    print(e);
+  }
+}
+
 class _LoggedInState extends State<LoggedIn> {
+  String token = '';
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -132,47 +211,22 @@ class _LoggedInState extends State<LoggedIn> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
+            ElevatedButton(
+                onPressed: () async {
+                  final accessToken = await getAccessToken(widget.code);
+                  print('$accessToken heeeeeeeeeere');
+                  setState(() {
+                    token = accessToken.toString();
+                  });
+                  print(token);
+                },
+                child: Text('Click for codes')),
             Text(
-              'You are logged in and here is your code ${widget.code}!',
+              'You are logged in and here is your token code ${token.toString()} and your authorization code ${widget.code} !',
             ),
           ],
         ),
       ),
     );
   }
-
-  final storage = FlutterSecureStorage();
-
-Future<void> getAccessToken(String clientId, String clientSecret, String code) async {
-  final tokenUrl = 'https://github.com/login/oauth/access_token';
-
-  final headers = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
-
-  final body = jsonEncode({
-    'client_id': '62c3f7e3b4797d7ff0ed',
-    'client_secret': 'fdb5b7b94552992b6c8fcdde502f6029e9df5403',
-    'code': '439c7ee38f7db5f1e6fa',
-  });
-
-  
-  final response = await http.post(
-    Uri.parse(tokenUrl),
-    headers: headers,
-    body: body,
-  );
-
-  if (response.statusCode == 200) {
-    final data = jsonDecode(response.body);
-    if (data['access_token'] != null) {
-      await storage.write(key: "token", value: data['access_token']);
-    } else {
-      throw Exception('Access token not found in the response');
-    }
-  } else {
-    throw Exception('Failed to get access token: ${response.statusCode}');
-  }
-}
 }

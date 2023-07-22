@@ -1,11 +1,23 @@
 import 'package:flutter/material.dart';
 import './github_api_service.dart';
 
-class ProfilePage extends StatelessWidget {
-  final String accessToken;
-  final GithubApiService githubApiService = GithubApiService();
+class ProfilePage extends StatefulWidget {
+  final String code;
+  ProfilePage({Key? key, required this.code});
 
-  ProfilePage({Key? key, required this.accessToken}) : super(key: key);
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  final GithubApiService githubApiService = GithubApiService();
+  late Future<Map<String, dynamic>> _userDataFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _userDataFuture = githubApiService.getuserdata(widget.code);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,12 +26,12 @@ class ProfilePage extends StatelessWidget {
         title: const Text('Profile'),
       ),
       body: FutureBuilder<Map<String, dynamic>>(
-        future: githubApiService.getuserdata(accessToken),
+        future: _userDataFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error fetching user data'));
+            return const Center(child: Text('Error fetching user data'));
           } else if (snapshot.hasData) {
             final userData = snapshot.data!;
             return Column(
@@ -36,3 +48,4 @@ class ProfilePage extends StatelessWidget {
     );
   }
 }
+

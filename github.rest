@@ -1,2 +1,3 @@
 GET http://api.github.com/user/starred?page=1
 Authorization: bearer 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
+POST https://github.com/login/oauth/access_token
