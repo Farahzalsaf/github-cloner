@@ -5,6 +5,7 @@ import 'package:auth_buttons/auth_buttons.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(const MyApp());
@@ -146,6 +147,30 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
+class UserRepoCard extends StatelessWidget {
+  final String repoName;
+  final String repoDescription;
+  final VoidCallback onTap;
+
+  const UserRepoCard({
+    required this.repoName,
+    required this.repoDescription,
+    required this.onTap,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        title: Text(repoName),
+        subtitle: Text(repoDescription),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
 class ProfileWidget extends StatefulWidget {
   final String code;
   final String accessToken;
@@ -159,11 +184,13 @@ class ProfileWidget extends StatefulWidget {
 
 class _ProfileWidgetState extends State<ProfileWidget> {
   Map<String, dynamic> _profileData = {};
+  List<dynamic> _userRepos = [];
 
   @override
   void initState() {
     super.initState();
     _fetchUserProfile();
+    _fetchUserRepos(); // Fetch user repositories during initialization
   }
 
   Future<void> _fetchUserProfile() async {
@@ -185,6 +212,26 @@ class _ProfileWidgetState extends State<ProfileWidget> {
       print('Error: $e');
     }
   }
+
+Future<void> _fetchUserRepos() async {
+  try {
+    final response = await http.get(
+      Uri.parse('https://api.github.com/user/repos'), // Use the correct URL to fetch user repositories
+      headers: {'Authorization': 'token ${widget.accessToken}'},
+    );
+
+    if (response.statusCode == 200) {
+      setState(() {
+        _userRepos = json.decode(response.body);
+        print('User Repositories: $_userRepos');
+      });
+    } else {
+      print('Failed to fetch user repositories: ${response.statusCode}');
+    }
+  } catch (e) {
+    print('Error: $e');
+  }
+}
 
   Future<Map<String, dynamic>> _fetchFollowersFollowing() async {
     try {
@@ -230,128 +277,178 @@ class _ProfileWidgetState extends State<ProfileWidget> {
       body: Center(
         child: _profileData.isEmpty
             ? CircularProgressIndicator()
-            : Column(
-                children: <Widget>[
-                  Container(
-                    margin: EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(12),
+            : SingleChildScrollView(
+                child: Column(
+                  children: <Widget>[
+                    Container(
+                      margin: EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 40,
+                            backgroundImage: NetworkImage(
+                              _profileData['avatar_url'] ?? '',
+                            ),
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            _profileData['name'] ?? 'No Name',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            _profileData['login'] ?? 'No Username',
+                            style: TextStyle(
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(height: 12),
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: _fetchFollowersFollowing(),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return CircularProgressIndicator();
+                              } else if (snapshot.hasError) {
+                                return Text('Error fetching followers and following');
+                              } else {
+                                final followers = snapshot.data?['followers'] ?? 0;
+                                final following = snapshot.data?['following'] ?? 0;
+                                return Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Column(
+                                      children: [
+                                        Text(
+                                          '$followers',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Followers',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(width: 16),
+                                    Column(
+                                      children: [
+                                        Text(
+                                          '$following',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Following',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        CircleAvatar(
-                          radius: 40,
-                          backgroundImage:
-                              NetworkImage(_profileData['avatar_url'] ?? ''),
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          _profileData['name'] ?? 'No Name',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                    SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => _StarredReposPage(
+                              accessToken: widget.accessToken,
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          _profileData['login'] ?? 'No Username',
-                          style: TextStyle(
-                            color: Colors.white,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        primary: Colors.grey[800],
+                        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                      child: Text('View Starred Repos'),
+                    ),
+                    SizedBox(height: 20),
+                    SizedBox(height: 20),
+                    ContributionsWidget(
+                      username: _profileData['login'] ?? '',
+                      widgetSize: 'medium',
+                      theme: 'green',
+                      weeks: 30,
+                    ),
+                    SizedBox(height: 20),
+                    // User Repositories Section
+                    Container(
+                      margin: EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black26,
+                            offset: Offset(0, 2),
+                            blurRadius: 4,
+                            spreadRadius: 0,
                           ),
-                        ),
-                        SizedBox(height: 12),
-                        FutureBuilder<Map<String, dynamic>>(
-                          future: _fetchFollowersFollowing(),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return CircularProgressIndicator();
-                            } else if (snapshot.hasError) {
-                              return Text(
-                                  'Error fetching followers and following');
-                            } else {
-                              final followers =
-                                  snapshot.data?['followers'] ?? 0;
-                              final following =
-                                  snapshot.data?['following'] ?? 0;
-                              return Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Column(
-                                    children: [
-                                      Text(
-                                        '$followers',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Followers',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            'User Repositories',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          SizedBox(height: 16),
+                          if (_userRepos.isNotEmpty)
+                            Column(
+                              children: [
+                                for (var repo in _userRepos.sublist(0, 5))
+                                  UserRepoCard(
+                                    repoName: repo['name'] ?? '',
+                                    repoDescription: repo['description'] ?? 'No description',
+                                    onTap: () {
+                                      final repoUrl = repo['html_url'];
+                                      if (repoUrl != null && repoUrl.isNotEmpty) {
+                                        launch(repoUrl);
+                                      }
+                                    },
                                   ),
-                                  SizedBox(width: 16),
-                                  Column(
-                                    children: [
-                                      Text(
-                                        '$following',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Following',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              );
-                            }
-                          },
-                        ),
-                      ],
+                              ],
+                            ),
+                          if (_userRepos.isEmpty)
+                            Text('No repositories found.'),
+                        ],
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => _StarredReposPage(
-                            accessToken: widget.accessToken,
-                          ),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      primary: Colors.grey[800],
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    ),
-                    child: Text('View Starred Repos'),
-                  ),
-                  SizedBox(height: 20),
-                  ContributionsWidget(
-                    username: _profileData['login'] ?? '',
-                    widgetSize: 'medium',
-                    theme: 'green',
-                    weeks: 30,
-                  ),
-                ],
+                  ],
+                ),
               ),
       ),
     );
@@ -431,9 +528,7 @@ class _ContributionsWidgetState extends State<ContributionsWidget> {
   }
 }
 
-
 class _StarredReposPage extends StatefulWidget {
-  // Add "_" before StarredReposPage
   final String accessToken;
 
   const _StarredReposPage({required this.accessToken});
@@ -443,7 +538,6 @@ class _StarredReposPage extends StatefulWidget {
 }
 
 class _StarredReposPageState extends State<_StarredReposPage> {
-  // Add "_" before StarredReposPageState
   List<dynamic> _starredRepos = [];
 
   @override
@@ -456,8 +550,7 @@ class _StarredReposPageState extends State<_StarredReposPage> {
     try {
       final response = await Dio().get(
         'https://api.github.com/user/starred',
-        options:
-            Options(headers: {'Authorization': 'token ${widget.accessToken}'}),
+        options: Options(headers: {'Authorization': 'token ${widget.accessToken}'}),
       );
 
       if (response.statusCode == 200) {
@@ -476,29 +569,29 @@ class _StarredReposPageState extends State<_StarredReposPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'Starred Repositories',
           style: TextStyle(color: Colors.black),
         ),
-        backgroundColor: Colors.white, // White background for the app bar
-        centerTitle: true, // Center the title horizontally
-        iconTheme: IconThemeData(color: Colors.black), // Set back button color
+        backgroundColor: Colors.white,
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.black),
       ),
       body: Container(
-        color: Colors.grey[300], // Light grey background for the body
+        color: Colors.grey[300],
         child: ListView.builder(
-          itemCount: _starredRepos.length,
+          itemCount: _starredRepos.length > 14 ? 14 : _starredRepos.length, // Show up to 5 repositories
           itemBuilder: (context, index) {
             final repo = _starredRepos[index];
-            return Card(
-              // Wrap each ListTile in a Card widget
-              child: ListTile(
-                title: Text(repo['name'] ?? ''),
-                subtitle: Text(repo['description'] ?? 'No description'),
-                onTap: () {
-                  // Handle tapping on a specific repository (if needed)
-                },
-              ),
+            return UserRepoCard(
+              repoName: repo['name'] ?? '',
+              repoDescription: repo['description'] ?? 'No description',
+              onTap: () {
+                final repoUrl = repo['html_url'];
+                if (repoUrl != null && repoUrl.isNotEmpty) {
+                  launch(repoUrl); // Use the launch method to open the URL
+                }
+              },
             );
           },
         ),
@@ -506,3 +599,5 @@ class _StarredReposPageState extends State<_StarredReposPage> {
     );
   }
 }
+
+
