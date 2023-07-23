@@ -32,7 +32,7 @@ class MyApp extends StatelessWidget {
           900: Color(0xFFFFFFFF),
         }),
       ),
-      home: const MyHomePage(title: 'Github cloner'),
+      home: const MyHomePage(title: 'Hub cloner'),
     );
   }
 }
@@ -158,7 +158,6 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-
 /**
  * after the comment, the UI of the app starts 
  */
@@ -202,13 +201,11 @@ class _ProfileWidgetState extends State<ProfileWidget> {
   Map<String, dynamic> _profileData = {};
   List<dynamic> _userRepos = [];
 
-
   @override
   void initState() {
     super.initState();
     _fetchUserProfile();
     _fetchUserRepos(); // Fetch user repositories during initialization
-
   }
 
   Future<void> _fetchUserProfile() async {
@@ -231,25 +228,26 @@ class _ProfileWidgetState extends State<ProfileWidget> {
     }
   }
 
-Future<void> _fetchUserRepos() async {
-  try {
-    final response = await http.get(
-      Uri.parse('https://api.github.com/user/repos'), // Use the correct URL to fetch user repositories
-      headers: {'Authorization': 'token ${widget.accessToken}'},
-    );
+  Future<void> _fetchUserRepos() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://api.github.com/user/repos'), // Use the correct URL to fetch user repositories
+        headers: {'Authorization': 'token ${widget.accessToken}'},
+      );
 
-    if (response.statusCode == 200) {
-      setState(() {
-        _userRepos = json.decode(response.body);
-        print('User Repositories: $_userRepos');
-      });
-    } else {
-      print('Failed to fetch user repositories: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        setState(() {
+          _userRepos = json.decode(response.body);
+          print('User Repositories: $_userRepos');
+        });
+      } else {
+        print('Failed to fetch user repositories: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error: $e');
     }
-  } catch (e) {
-    print('Error: $e');
   }
-}
 
   Future<Map<String, dynamic>> _fetchFollowersFollowing() async {
     try {
@@ -301,20 +299,19 @@ Future<void> _fetchUserRepos() async {
                 child: Column(
                   children: <Widget>[
                     Container(
-                      margin: EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                      margin:
+                          EdgeInsets.symmetric(vertical: 16, horizontal: 32),
                       decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
-                            offset: Offset(0, 2),
-                            blurRadius: 4,
-                            spreadRadius: 0,
-                          )
-                        ]
-                        
-                      ),
+                          color: Colors.black,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              offset: Offset(0, 2),
+                              blurRadius: 4,
+                              spreadRadius: 0,
+                            )
+                          ]),
                       padding: EdgeInsets.all(16),
                       child: Column(
                         children: [
@@ -348,10 +345,13 @@ Future<void> _fetchUserRepos() async {
                                   ConnectionState.waiting) {
                                 return CircularProgressIndicator();
                               } else if (snapshot.hasError) {
-                                return Text('Error fetching followers and following');
+                                return Text(
+                                    'Error fetching followers and following');
                               } else {
-                                final followers = snapshot.data?['followers'] ?? 0;
-                                final following = snapshot.data?['following'] ?? 0;
+                                final followers =
+                                    snapshot.data?['followers'] ?? 0;
+                                final following =
+                                    snapshot.data?['following'] ?? 0;
                                 return Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -413,12 +413,15 @@ Future<void> _fetchUserRepos() async {
                         );
                       },
                       style: TextButton.styleFrom(
-                        backgroundColor: Colors.grey[200], // Set the background color to light grey
-                        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        backgroundColor: Colors.grey[
+                            200], // Set the background color to light grey
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       ),
                       child: Text(
                         'View Starred Repos',
-                        style: TextStyle(color: Colors.black), // Set the text color to black
+                        style: TextStyle(
+                            color: Colors.black), // Set the text color to black
                       ),
                     ),
                     SizedBox(height: 20),
@@ -432,7 +435,8 @@ Future<void> _fetchUserRepos() async {
                     SizedBox(height: 20),
                     // User Repositories Section
                     Container(
-                      margin: EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                      margin:
+                          EdgeInsets.symmetric(vertical: 16, horizontal: 32),
                       padding: EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -464,10 +468,12 @@ Future<void> _fetchUserRepos() async {
                                 for (var repo in _userRepos.sublist(0, 5))
                                   UserRepoCard(
                                     repoName: repo['name'] ?? '',
-                                    repoDescription: repo['description'] ?? 'No description',
+                                    repoDescription:
+                                        repo['description'] ?? 'No description',
                                     onTap: () {
                                       final repoUrl = repo['html_url'];
-                                      if (repoUrl != null && repoUrl.isNotEmpty) {
+                                      if (repoUrl != null &&
+                                          repoUrl.isNotEmpty) {
                                         launch(repoUrl);
                                       }
                                     },
@@ -482,13 +488,10 @@ Future<void> _fetchUserRepos() async {
                   ],
                 ),
               ),
-              
       ),
     );
   }
 }
-
-
 
 class ContributionsWidget extends StatefulWidget {
   final String? username; // Make username nullable
@@ -583,7 +586,8 @@ class _StarredReposPageState extends State<_StarredReposPage> {
     try {
       final response = await Dio().get(
         'https://api.github.com/user/starred',
-        options: Options(headers: {'Authorization': 'token ${widget.accessToken}'}),
+        options:
+            Options(headers: {'Authorization': 'token ${widget.accessToken}'}),
       );
 
       if (response.statusCode == 200) {
@@ -613,7 +617,9 @@ class _StarredReposPageState extends State<_StarredReposPage> {
       body: Container(
         color: Colors.grey[300],
         child: ListView.builder(
-          itemCount: _starredRepos.length > 14 ? 14 : _starredRepos.length, // Show up to 5 repositories
+          itemCount: _starredRepos.length > 14
+              ? 14
+              : _starredRepos.length, // Show up to 5 repositories
           itemBuilder: (context, index) {
             final repo = _starredRepos[index];
             return UserRepoCard(
@@ -632,5 +638,3 @@ class _StarredReposPageState extends State<_StarredReposPage> {
     );
   }
 }
-
-
