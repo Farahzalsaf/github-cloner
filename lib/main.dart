@@ -1,11 +1,10 @@
 import 'dart:convert';
-import 'package:auth_buttons/auth_buttons.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:auth_buttons/auth_buttons.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
-// import 'package:url_launcher/url_launcher.dart';
-// import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const MyApp());
@@ -14,7 +13,6 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -29,15 +27,6 @@ class MyApp extends StatelessWidget {
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
 
   final String title;
 
@@ -62,18 +51,8 @@ class _MyHomePageState extends State<MyHomePage> {
                   .toString()
                   .startsWith('http://localhost:3000/callback')) {
                 final code = Uri.parse(url.toString()).queryParameters['code'];
-
                 if (code != null) {
-                  Future<void> _handleCode(String code) async {
-                    await Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => LoggedIn(code: code),
-                      ),
-                    );
-                  }
-
-                  await _handleCode(code);
+                  _handleCode(code);
                 }
               }
             }
@@ -83,7 +62,26 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  Future<String?> getAccessToken(String code) async {
+  Future<void> _handleCode(String code) async {
+    try {
+      final accessToken = await _getAccessToken(code);
+      if (accessToken != null && accessToken.isNotEmpty) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProfileWidget(
+              code: code,
+              accessToken: accessToken,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error handling code: $e');
+    }
+  }
+
+  Future<String?> _getAccessToken(String code) async {
     try {
       const tokenUrl = 'https://github.com/login/oauth/access_token';
       Dio dio = Dio();
@@ -91,6 +89,7 @@ class _MyHomePageState extends State<MyHomePage> {
       final headers = {
         'Content-Type': 'application/json',
         'Accept': '*/*',
+        'Authorization': 'Bearer token'
       };
 
       final body = {
@@ -108,9 +107,12 @@ class _MyHomePageState extends State<MyHomePage> {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.data);
-        if (data['access_token'] != null) {
-          return data['access_token'];
+        final data = response.data;
+        String res = '';
+        if (data != null) {
+          res = data.replaceAll('access_token=', '');
+          res = res.replaceAll('&scope=read%3Auser&token_type=bearer', '');
+          return await res;
         } else {
           throw Exception('Access token not found in the response');
         }
@@ -144,86 +146,361 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-class LoggedIn extends StatefulWidget {
+class ProfileWidget extends StatefulWidget {
   final String code;
-  const LoggedIn({super.key, required this.code});
+  final String accessToken;
+
+  const ProfileWidget({required this.code, required this.accessToken, Key? key})
+      : super(key: key);
 
   @override
-  State<LoggedIn> createState() => _LoggedInState();
+  _ProfileWidgetState createState() => _ProfileWidgetState();
 }
 
-Future<String?> getAccessToken(String code) async {
-  try {
-    const tokenUrl = 'https://github.com/login/oauth/access_token';
-    Dio dio = Dio();
-    dio.interceptors.add(PrettyDioLogger());
-    final headers = {
-      'Content-Type': 'application/json',
-      'Accept': '*/*',
-      'Authorization': 'Bearer token'
-    };
+class _ProfileWidgetState extends State<ProfileWidget> {
+  Map<String, dynamic> _profileData = {};
 
-    final body = {
-      'client_id': "62c3f7e3b4797d7ff0ed",
-      'client_secret': "fdb5b7b94552992b6c8fcdde502f6029e9df5403",
-      'code': code,
-    };
-
-    final response = await dio.get(
-      tokenUrl,
-      options: Options(
-        headers: headers,
-      ),
-      data: body,
-    );
-
-    if (response.statusCode == 200) {
-      // final data = jsonDecode(response.data);
-      final data = response.data;
-      String res = '';
-      if (data != null) {
-        res = data.replaceAll('access_token=', '');
-        res = res.replaceAll('&scope=read%3Auser&token_type=bearer', '');
-        print(data);
-        return await res;
-      } else {
-        throw Exception('Access token not found in the response');
-      }
-    } else {
-      throw Exception('Failed to get access token: ${response.statusCode}');
-    }
-  } catch (e) {
-    print(e);
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserProfile();
   }
-}
 
-class _LoggedInState extends State<LoggedIn> {
-  String token = '';
+  Future<void> _fetchUserProfile() async {
+    try {
+      final response = await Dio().get(
+        'https://api.github.com/user',
+        options:
+            Options(headers: {'Authorization': 'token ${widget.accessToken}'}),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _profileData = response.data;
+        });
+      } else {
+        print('Failed to fetch user profile: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> _fetchFollowersFollowing() async {
+    try {
+      final followersResponse = await Dio().get(
+        'https://api.github.com/user/followers',
+        options:
+            Options(headers: {'Authorization': 'token ${widget.accessToken}'}),
+      );
+
+      final followingResponse = await Dio().get(
+        'https://api.github.com/user/following',
+        options:
+            Options(headers: {'Authorization': 'token ${widget.accessToken}'}),
+      );
+
+      if (followersResponse.statusCode == 200 &&
+          followingResponse.statusCode == 200) {
+        final followersData = followersResponse.data;
+        final followingData = followingResponse.data;
+        return {
+          'followers': followersData.length,
+          'following': followingData.length,
+        };
+      } else {
+        throw Exception('Failed to fetch followers and following data');
+      }
+    } catch (e) {
+      print('Error fetching followers and following: $e');
+      throw Exception('Failed to fetch followers and following data');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Logged In'),
+        title: Text(
+          'GitHub Profile',
+          style: TextStyle(color: Colors.white),
+        ),
       ),
+      backgroundColor: Colors.white,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            ElevatedButton(
-                onPressed: () async {
-                  final accessToken = await getAccessToken(widget.code);
-                  print('$accessToken heeeeeeeeeere');
-                  setState(() {
-                    token = accessToken.toString();
-                  });
-                  print(token);
-                },
-                child: Text('Click for codes')),
-            Text(
-              'You are logged in and here is your token code ${token.toString()} and your authorization code ${widget.code} !',
+        child: _profileData.isEmpty
+            ? CircularProgressIndicator()
+            : Column(
+                children: <Widget>[
+                  Container(
+                    margin: EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        CircleAvatar(
+                          radius: 40,
+                          backgroundImage:
+                              NetworkImage(_profileData['avatar_url'] ?? ''),
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          _profileData['name'] ?? 'No Name',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          _profileData['login'] ?? 'No Username',
+                          style: TextStyle(
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 12),
+                        FutureBuilder<Map<String, dynamic>>(
+                          future: _fetchFollowersFollowing(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return CircularProgressIndicator();
+                            } else if (snapshot.hasError) {
+                              return Text(
+                                  'Error fetching followers and following');
+                            } else {
+                              final followers =
+                                  snapshot.data?['followers'] ?? 0;
+                              final following =
+                                  snapshot.data?['following'] ?? 0;
+                              return Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Column(
+                                    children: [
+                                      Text(
+                                        '$followers',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Followers',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(width: 16),
+                                  Column(
+                                    children: [
+                                      Text(
+                                        '$following',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Following',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => _StarredReposPage(
+                            accessToken: widget.accessToken,
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      primary: Colors.grey[800],
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                    child: Text('View Starred Repos'),
+                  ),
+                  SizedBox(height: 20),
+                  ContributionsWidget(
+                    username: _profileData['login'] ?? '',
+                    widgetSize: 'medium',
+                    theme: 'green',
+                    weeks: 30,
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+
+
+class ContributionsWidget extends StatefulWidget {
+  final String? username; // Make username nullable
+  final String widgetSize;
+  final String theme;
+  final int weeks;
+
+  const ContributionsWidget({
+    required this.username,
+    required this.widgetSize,
+    required this.theme,
+    required this.weeks,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  _ContributionsWidgetState createState() => _ContributionsWidgetState();
+}
+
+class _ContributionsWidgetState extends State<ContributionsWidget> {
+  late String _url;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.username != null) {
+      _url =
+          'https://contribution.catsjuice.com/_/${widget.username}?format=png&weeks=${widget.weeks}&theme=${widget.theme}&widget_size=${widget.widgetSize}';
+    } else {
+      _url = '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(16),
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white, // Set the container color to white
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black26,
+            offset: Offset(0, 2),
+            blurRadius: 4,
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            'Contributions',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
             ),
-          ],
+          ),
+          SizedBox(height: 16),
+          if (_url.isNotEmpty)
+            Image.network(_url)
+          else
+            Text('No contributions data available.'),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _StarredReposPage extends StatefulWidget {
+  // Add "_" before StarredReposPage
+  final String accessToken;
+
+  const _StarredReposPage({required this.accessToken});
+
+  @override
+  State<_StarredReposPage> createState() => _StarredReposPageState();
+}
+
+class _StarredReposPageState extends State<_StarredReposPage> {
+  // Add "_" before StarredReposPageState
+  List<dynamic> _starredRepos = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStarredRepos();
+  }
+
+  Future<void> _fetchStarredRepos() async {
+    try {
+      final response = await Dio().get(
+        'https://api.github.com/user/starred',
+        options:
+            Options(headers: {'Authorization': 'token ${widget.accessToken}'}),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _starredRepos = response.data;
+        });
+      } else {
+        print('Failed to fetch starred repos: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Starred Repositories',
+          style: TextStyle(color: Colors.black),
+        ),
+        backgroundColor: Colors.white, // White background for the app bar
+        centerTitle: true, // Center the title horizontally
+        iconTheme: IconThemeData(color: Colors.black), // Set back button color
+      ),
+      body: Container(
+        color: Colors.grey[300], // Light grey background for the body
+        child: ListView.builder(
+          itemCount: _starredRepos.length,
+          itemBuilder: (context, index) {
+            final repo = _starredRepos[index];
+            return Card(
+              // Wrap each ListTile in a Card widget
+              child: ListTile(
+                title: Text(repo['name'] ?? ''),
+                subtitle: Text(repo['description'] ?? 'No description'),
+                onTap: () {
+                  // Handle tapping on a specific repository (if needed)
+                },
+              ),
+            );
+          },
         ),
       ),
     );

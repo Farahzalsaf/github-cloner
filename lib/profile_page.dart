@@ -1,51 +1,80 @@
 import 'package:flutter/material.dart';
-import './github_api_service.dart';
+import 'package:dio/dio.dart';
 
 class ProfilePage extends StatefulWidget {
-  final String code;
-  ProfilePage({Key? key, required this.code});
+  final String accessToken;
+
+  const ProfilePage({required this.accessToken, Key? key}) : super(key: key);
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  _ProfilePageState createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  final GithubApiService githubApiService = GithubApiService();
-  late Future<Map<String, dynamic>> _userDataFuture;
+  Map<String, dynamic> _profileData = {};
 
   @override
   void initState() {
     super.initState();
-    _userDataFuture = githubApiService.getuserdata(widget.code);
+    _fetchUserProfile();
+  }
+
+  Future<void> _fetchUserProfile() async {
+    try {
+      final response = await Dio().get(
+        'https://api.github.com/user',
+        options: Options(headers: {'Authorization': 'token ${widget.accessToken}'}),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _profileData = response.data;
+        });
+      } else {
+        // Handle error case
+        print('Failed to fetch user profile: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: Text('GitHub Profile'),
       ),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _userDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return const Center(child: Text('Error fetching user data'));
-          } else if (snapshot.hasData) {
-            final userData = snapshot.data!;
-            return Column(
-              children: [
-                Text('Name: ${userData['name']}'),
-                // Display other user information as desired
-              ],
-            );
-          } else {
-            return const Center(child: Text('No user data found'));
-          }
-        },
+      body: Center(
+        child: _profileData.isEmpty
+            ? CircularProgressIndicator()
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: <Widget>[
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundImage: NetworkImage(_profileData['avatar_url'] ?? ''),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    _profileData['name'] ?? 'No Name',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 8),
+                  Text(_profileData['login'] ?? 'No Username'),
+                  SizedBox(height: 8),
+                  Text(_profileData['email'] ?? 'No Email'),
+                  SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      // Handle log out or navigate back to previous screen
+                    },
+                    child: Text('Log Out'),
+                  ),
+                ],
+              ),
       ),
     );
   }
 }
-
