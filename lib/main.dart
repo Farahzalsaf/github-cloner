@@ -19,9 +19,20 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primarySwatch: MaterialColor(0xFFFFFFFF, {
+          50: Color(0xFFFFFFFF),
+          100: Color(0xFFFFFFFF),
+          200: Color(0xFFFFFFFF),
+          300: Color(0xFFFFFFFF),
+          400: Color(0xFFFFFFFF),
+          500: Color(0xFFFFFFFF),
+          600: Color(0xFFFFFFFF),
+          700: Color(0xFFFFFFFF),
+          800: Color(0xFFFFFFFF),
+          900: Color(0xFFFFFFFF),
+        }),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MyHomePage(title: 'Github cloner'),
     );
   }
 }
@@ -147,6 +158,11 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
+
+/**
+ * after the comment, the UI of the app starts 
+ */
+
 class UserRepoCard extends StatelessWidget {
   final String repoName;
   final String repoDescription;
@@ -186,11 +202,13 @@ class _ProfileWidgetState extends State<ProfileWidget> {
   Map<String, dynamic> _profileData = {};
   List<dynamic> _userRepos = [];
 
+
   @override
   void initState() {
     super.initState();
     _fetchUserProfile();
     _fetchUserRepos(); // Fetch user repositories during initialization
+
   }
 
   Future<void> _fetchUserProfile() async {
@@ -287,6 +305,15 @@ Future<void> _fetchUserRepos() async {
                       decoration: BoxDecoration(
                         color: Colors.black,
                         borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            offset: Offset(0, 2),
+                            blurRadius: 4,
+                            spreadRadius: 0,
+                          )
+                        ]
+                        
                       ),
                       padding: EdgeInsets.all(16),
                       child: Column(
@@ -455,6 +482,7 @@ Future<void> _fetchUserRepos() async {
                   ],
                 ),
               ),
+              
       ),
     );
   }
