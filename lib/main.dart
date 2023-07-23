@@ -270,10 +270,12 @@ Future<void> _fetchUserRepos() async {
       appBar: AppBar(
         title: Text(
           'GitHub Profile',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: Colors.black),
         ),
+        backgroundColor: Colors.white, // Set the background color to white
+        iconTheme: IconThemeData(color: Colors.black),
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[200],
       body: Center(
         child: _profileData.isEmpty
             ? CircularProgressIndicator()
@@ -383,11 +385,14 @@ Future<void> _fetchUserRepos() async {
                           ),
                         );
                       },
-                      style: ElevatedButton.styleFrom(
-                        primary: Colors.grey[800],
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.grey[200], // Set the background color to light grey
                         padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       ),
-                      child: Text('View Starred Repos'),
+                      child: Text(
+                        'View Starred Repos',
+                        style: TextStyle(color: Colors.black), // Set the text color to black
+                      ),
                     ),
                     SizedBox(height: 20),
                     SizedBox(height: 20),
